@@ -1,7 +1,6 @@
 package com.dds.webrtclib.ui;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -11,23 +10,26 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import com.dds.webrtclib.IViewCallback;
 import com.dds.webrtclib.PeerConnectionHelper;
 import com.dds.webrtclib.ProxyVideoSink;
 import com.dds.webrtclib.R;
 import com.dds.webrtclib.WebRTCManager;
+import com.dds.webrtclib.utils.NetworkStatisticManager;
 import com.dds.webrtclib.utils.PermissionUtil;
+import com.dds.webrtclib.utils.SurfaceViewRenderHelper;
 
 import org.webrtc.EglBase;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.SurfaceViewRenderer;
+import org.webrtc.VideoSink;
 
 /**
  * 单聊界面
@@ -47,6 +49,24 @@ public class ChatSingleActivity extends AppCompatActivity {
 
     private EglBase rootEglBase;
 
+    private ProxyVideoSink.VideoListener videoListener = new ProxyVideoSink.VideoListener() {
+        @Override
+        public void onCameraQualityChanged(VideoSink videoSink, @PeerConnectionHelper.Quality String quality) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    SurfaceViewRenderer viewRenderer = (SurfaceViewRenderer) videoSink;
+                    if (viewRenderer.getId() == R.id.remote_view_render) {
+                        viewRenderer.setTag(quality);
+                        if (PeerConnectionHelper.HVGA.equals(quality)) {
+                            Toast.makeText(viewRenderer.getContext(), "对方当前网络不佳", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }
+            });
+        }
+    };
+
     public static void openActivity(Context activity, boolean videoEnable) {
         Intent intent = new Intent(activity, ChatSingleActivity.class);
         intent.putExtra("videoEnable", videoEnable);
@@ -63,13 +83,18 @@ public class ChatSingleActivity extends AppCompatActivity {
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.wr_activity_chat_single);
+        NetworkStatisticManager.getInstance().register(new NetworkStatisticManager.OnNetWorkStatusListener() {
+            @Override
+            public void onSpeedInfo(float speedR, float speedT) {
+
+            }
+        }).start();
         initVar();
         initListener();
     }
 
 
     private int previewX, previewY;
-    private int moveX, moveY;
 
     private void initVar() {
         Intent intent = getIntent();
@@ -83,16 +108,17 @@ public class ChatSingleActivity extends AppCompatActivity {
             remote_view = findViewById(R.id.remote_view_render);
 
             // 本地图像初始化
-            local_view.init(rootEglBase.getEglBaseContext(), null);
+            SurfaceViewRenderHelper.init(rootEglBase.getEglBaseContext(), local_view);
             local_view.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
             local_view.setZOrderMediaOverlay(true);
-            local_view.setMirror(true);
             localRender = new ProxyVideoSink();
+            local_view.setTag(localRender.getQuality());
+
             //远端图像初始化
-            remote_view.init(rootEglBase.getEglBaseContext(), null);
+            SurfaceViewRenderHelper.init(rootEglBase.getEglBaseContext(), remote_view);
             remote_view.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_BALANCED);
-            remote_view.setMirror(true);
             remoteRender = new ProxyVideoSink();
+            remote_view.setTag(remoteRender.getQuality());
             setSwappedFeeds(true);
 
             local_view.setOnClickListener(v -> setSwappedFeeds(!isSwappedFeeds));
@@ -115,8 +141,6 @@ public class ChatSingleActivity extends AppCompatActivity {
                     case MotionEvent.ACTION_MOVE:
                         int x = (int) motionEvent.getX();
                         int y = (int) motionEvent.getY();
-                        moveX = (int) motionEvent.getX();
-                        moveY = (int) motionEvent.getY();
                         RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) local_view.getLayoutParams();
                         lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, 0); // Clears the rule, as there is no removeRule until API 17.
                         lp.addRule(RelativeLayout.ALIGN_PARENT_END, 0);
@@ -129,11 +153,11 @@ public class ChatSingleActivity extends AppCompatActivity {
                         view.setLayoutParams(lp);
                         break;
                     case MotionEvent.ACTION_UP:
+                        int moveX = (int) motionEvent.getX() - previewX;
+                        int moveY = (int) motionEvent.getY() - previewY;
                         if (moveX == 0 && moveY == 0) {
                             view.performClick();
                         }
-                        moveX = 0;
-                        moveY = 0;
                         break;
                 }
                 return true;
@@ -158,6 +182,7 @@ public class ChatSingleActivity extends AppCompatActivity {
 
                 if (videoEnable) {
                     stream.videoTracks.get(0).setEnabled(true);
+                    localRender.setVideoListener(videoListener);
                 }
             }
 
@@ -168,7 +193,7 @@ public class ChatSingleActivity extends AppCompatActivity {
                 }
                 if (videoEnable) {
                     stream.videoTracks.get(0).setEnabled(true);
-
+                    remoteRender.setVideoListener(videoListener);
                     runOnUiThread(() -> setSwappedFeeds(false));
                 }
             }
@@ -199,13 +224,6 @@ public class ChatSingleActivity extends AppCompatActivity {
 
     }
 
-
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        return keyCode == KeyEvent.KEYCODE_BACK || super.onKeyDown(keyCode, event);
-    }
-
-
     // 切换摄像头
     public void switchCamera() {
         manager.switchCamera();
@@ -228,11 +246,19 @@ public class ChatSingleActivity extends AppCompatActivity {
 
     }
 
+    /**
+     * 修改采集分辨率
+     * @param quality
+     */
+    public void changeQuality(@PeerConnectionHelper.Quality String quality) {
+        manager.changeQuality(quality);
+    }
+
     @Override
     protected void onDestroy() {
         disConnect();
+        NetworkStatisticManager.getInstance().stop();
         super.onDestroy();
-
     }
 
     private void disConnect() {

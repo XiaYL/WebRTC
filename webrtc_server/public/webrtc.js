@@ -14,7 +14,7 @@ Array.prototype.remove = function(val) {
 };
 
 var config = {
-  wssHost: 'wss://172.17.17.114'
+  wssHost: 'wss://localhost'
   // wssHost: 'wss://172.18.0.48'
   // wssHost: 'wss://192.168.31.111'
   // wssHost: 'wss://example.com/myWebSocket'
@@ -36,8 +36,8 @@ var peerConn = null,
       // {'urls': 'stun:stun.voxgratia.org'}, 
       // {'urls': 'stun:stunserver.org'}
       // {'urls': 'stun:172.17.16.158:3478'}
-      {'urls': 'stun:172.16.134.8:3478'},
-      {'urls': 'stun:172.16.134.8:3478'}
+      {'urls': 'stun:172.17.16.43:3478'},
+      {'urls': 'stun:172.17.16.43:3478'}
   ]
   };
 var _roomId = null

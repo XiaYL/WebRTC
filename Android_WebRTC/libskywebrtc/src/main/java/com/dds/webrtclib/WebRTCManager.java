@@ -3,6 +3,7 @@ package com.dds.webrtclib;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.dds.webrtclib.bean.MediaType;
 import com.dds.webrtclib.bean.MyIceServer;
@@ -15,6 +16,7 @@ import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -37,6 +39,7 @@ public class WebRTCManager implements ISignalingEvents {
 
     private IConnectEvent _connectEvent;
     private Handler handler = new Handler(Looper.getMainLooper());
+    private Date startDtm;
 
     public static WebRTCManager getInstance() {
         return Holder.wrManager;
@@ -108,12 +111,19 @@ public class WebRTCManager implements ISignalingEvents {
         }
     }
 
+    public void changeQuality(@PeerConnectionHelper.Quality String quality) {
+        if (_peerHelper != null) {
+            _peerHelper.changeQuality(quality);
+        }
+    }
+
     public void exitRoom() {
         if (_peerHelper != null) {
             _webSocket = null;
             _peerHelper.exitRoom();
         }
         _connectEvent = null;
+        startDtm = null;
     }
 
     // ==================================信令回调===============================================
@@ -125,7 +135,7 @@ public class WebRTCManager implements ISignalingEvents {
             }
 
         });
-
+        startDtm = new Date();
     }
 
     @Override
@@ -144,6 +154,7 @@ public class WebRTCManager implements ISignalingEvents {
 
     @Override
     public void onJoinToRoom(ArrayList<String> connections, String myId) {
+        Log.i(TAG, "onJoinToRoom: " + myId);
         handler.post(() -> {
             if (_peerHelper != null) {
                 _peerHelper.onJoinToRoom(connections, myId, _videoEnable, _mediaType);
@@ -152,7 +163,7 @@ public class WebRTCManager implements ISignalingEvents {
                 }
             }
         });
-
+        startDtm = new Date();
     }
 
     @Override
@@ -216,5 +227,14 @@ public class WebRTCManager implements ISignalingEvents {
 
     }
 
+    public boolean isConnected() {
+        return _webSocket != null && _webSocket.isOpen();
+    }
+
+    public long getCallDuration(Date endDtm) {
+        if (startDtm != null && endDtm != null)
+            return endDtm.getTime() - startDtm.getTime();
+        return 0;
+    }
 
 }

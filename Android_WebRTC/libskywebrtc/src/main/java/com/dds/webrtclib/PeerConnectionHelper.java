@@ -4,6 +4,7 @@ package com.dds.webrtclib;
 import android.content.Context;
 import android.media.AudioManager;
 import android.support.annotation.Nullable;
+import android.support.annotation.StringDef;
 import android.util.Log;
 
 import com.dds.webrtclib.bean.MediaType;
@@ -37,6 +38,10 @@ import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 import org.webrtc.audio.JavaAudioDeviceModule;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -53,9 +58,13 @@ public class PeerConnectionHelper {
 
     public final static String TAG = "dds_webRtcHelper";
 
-    public static final int VIDEO_RESOLUTION_WIDTH = 320;
-    public static final int VIDEO_RESOLUTION_HEIGHT = 240;
-    public static final int FPS = 10;
+    public static final String HVGA = "320p";
+    public static final String VGA = "480p";
+    public static final String HD = "720p";
+
+    public static final int VIDEO_RESOLUTION_WIDTH = 640;
+    public static final int VIDEO_RESOLUTION_HEIGHT = 480;
+    public static final int FPS = 15;
     private static final String VIDEO_CODEC_H264 = "H264";
     public static final String VIDEO_TRACK_ID = "ARDAMSv0";
     public static final String AUDIO_TRACK_ID = "ARDAMSa0";
@@ -85,6 +94,15 @@ public class PeerConnectionHelper {
     private Context _context;
 
     private EglBase _rootEglBase;
+
+    @StringDef({
+            HVGA, VGA, HD
+    })
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.PARAMETER,ElementType.FIELD})
+    public  @interface Quality {
+
+    }
 
     @Nullable
     private SurfaceTextureHelper surfaceTextureHelper;
@@ -324,6 +342,23 @@ public class PeerConnectionHelper {
 
     }
 
+    public void changeQuality(@Quality String quality) {
+        if (captureAndroid == null) {
+            return;
+        }
+        switch (quality) {
+            case HVGA:
+                captureAndroid.changeCaptureFormat(480, 320, FPS);
+                break;
+            case VGA:
+                captureAndroid.changeCaptureFormat(640, 480, FPS);
+                break;
+            case HD:
+                captureAndroid.changeCaptureFormat(1080, 720, FPS);
+                break;
+        }
+    }
+
     // 设置自己静音
     public void toggleMute(boolean enable) {
         if (_localAudioTrack != null) {
@@ -393,7 +428,6 @@ public class PeerConnectionHelper {
 
 
     }
-
 
     private VideoCapturer createVideoCapture() {
         VideoCapturer videoCapturer;
