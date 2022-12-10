@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/dimircea/WebRTC#readme",
   "dependencies": {
-    "express": "^4.14.0",
+    "express": "^4.17.3",
     "fs": "0.0.1-security",
     "uuid": "^3.3.2",
     "ws": "^1.1.1"
